@@ -1,0 +1,598 @@
+<?php
+require_once '../config/database.php';
+
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
+    header('Location: ../login.php');
+    exit();
+}
+
+$error = '';
+$success = '';
+
+// Proses Tambah Dokter
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
+    if ($_POST['action'] == 'tambah') {
+        $username = $conn->real_escape_string($_POST['username']);
+        $password = $_POST['password'];
+        $nama_dokter = $conn->real_escape_string($_POST['nama_dokter']);
+        $spesialisasi = $conn->real_escape_string($_POST['spesialisasi']);
+        $id_poli = intval($_POST['id_poli']);
+        
+        // Cek username sudah ada
+        $check = $conn->query("SELECT * FROM users WHERE username = '$username'");
+        if ($check->num_rows > 0) {
+            $error = "Username sudah digunakan!";
+        } else {
+            // Insert ke users
+            $conn->query("INSERT INTO users (username, password, role) VALUES ('$username', '$password', 'dokter')");
+            $id_user = $conn->insert_id;
+            
+            // Insert ke dokter
+            $conn->query("INSERT INTO dokter (id_user, nama_dokter, spesialisasi, id_poli) 
+                          VALUES ('$id_user', '$nama_dokter', '$spesialisasi', '$id_poli')");
+            $id_dokter = $conn->insert_id;
+            
+            // Insert jadwal
+            if (isset($_POST['hari']) && !empty($_POST['hari'])) {
+                foreach ($_POST['hari'] as $hari) {
+                    $conn->query("INSERT INTO jadwal_dokter (id_dokter, hari) VALUES ('$id_dokter', '$hari')");
+                }
+            }
+            $success = "Dokter berhasil ditambahkan!";
+        }
+    }
+    
+    // Proses Edit Dokter
+    if ($_POST['action'] == 'edit') {
+        $id_dokter = intval($_POST['id_dokter']);
+        $nama_dokter = $conn->real_escape_string($_POST['nama_dokter']);
+        $spesialisasi = $conn->real_escape_string($_POST['spesialisasi']);
+        $id_poli = intval($_POST['id_poli']);
+        
+        $conn->query("UPDATE dokter SET nama_dokter = '$nama_dokter', spesialisasi = '$spesialisasi', id_poli = '$id_poli' 
+                      WHERE id_dokter = '$id_dokter'");
+        
+        // Update jadwal (hapus lama, insert baru)
+        $conn->query("DELETE FROM jadwal_dokter WHERE id_dokter = '$id_dokter'");
+        if (isset($_POST['hari']) && !empty($_POST['hari'])) {
+            foreach ($_POST['hari'] as $hari) {
+                $conn->query("INSERT INTO jadwal_dokter (id_dokter, hari) VALUES ('$id_dokter', '$hari')");
+            }
+        }
+        $success = "Dokter berhasil diupdate!";
+    }
+    
+    // Proses Hapus Dokter
+    if ($_POST['action'] == 'hapus') {
+        $id_dokter = intval($_POST['id_dokter']);
+        
+        // Ambil id_user
+        $dokter = $conn->query("SELECT id_user FROM dokter WHERE id_dokter = '$id_dokter'")->fetch_assoc();
+        $id_user = $dokter['id_user'];
+        
+        // Hapus data terkait
+        $conn->query("DELETE FROM jadwal_dokter WHERE id_dokter = '$id_dokter'");
+        $conn->query("DELETE FROM dokter WHERE id_dokter = '$id_dokter'");
+        $conn->query("DELETE FROM users WHERE id_user = '$id_user'");
+        
+        $success = "Dokter berhasil dihapus!";
+    }
+}
+
+// Ambil data dokter dengan jadwal
+$dokter_list = $conn->query("
+    SELECT d.*, u.username, p.nama_poli,
+           GROUP_CONCAT(j.hari ORDER BY FIELD(j.hari, 'Senin','Selasa','Rabu','Kamis','Jumat','Sabtu') SEPARATOR ', ') as hari_praktek
+    FROM dokter d
+    JOIN users u ON d.id_user = u.id_user
+    JOIN poli p ON d.id_poli = p.id_poli
+    LEFT JOIN jadwal_dokter j ON d.id_dokter = j.id_dokter
+    GROUP BY d.id_dokter
+    ORDER BY d.id_dokter
+");
+
+// Ambil daftar poli untuk dropdown
+$poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
+?>
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelola Dokter - MEDKLIK</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f4f9;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 260px;
+            background: white;
+            height: 100vh;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+            position: fixed;
+            left: 0;
+            top: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px 20px;
+            border-bottom: 1px solid #eef2f6;
+        }
+
+        .sidebar-header h2 {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar-header p {
+            font-size: 11px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+
+        .nav-menu {
+            flex: 1;
+            padding: 16px 0;
+        }
+
+        .nav-item {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #4a5568;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .nav-item:hover {
+            background: #f0f4f9;
+            color: #2a5298;
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(30,60,114,0.1) 0%, rgba(42,82,152,0.1) 100%);
+            color: #2a5298;
+            border-right: 3px solid #2a5298;
+        }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid #eef2f6;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .user-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .user-role {
+            font-size: 11px;
+            color: #6c757d;
+        }
+
+        .logout-btn {
+            display: block;
+            text-align: center;
+            padding: 8px;
+            background: #fee2e2;
+            color: #dc2626;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* MAIN CONTENT */
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 20px 24px;
+            overflow-y: auto;
+            height: 100vh;
+        }
+
+        /* Welcome Card */
+        .welcome-card {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .welcome-card h1 {
+            font-size: 18px;
+            margin-bottom: 6px;
+        }
+
+        .welcome-card p {
+            font-size: 12px;
+            opacity: 0.85;
+        }
+
+        /* Form Card */
+        .form-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #eef2f6;
+        }
+
+        .form-card h2 {
+            font-size: 18px;
+            color: #1e3c72;
+            margin-bottom: 16px;
+        }
+
+        /* Table Card */
+        .table-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #eef2f6;
+        }
+
+        .table-card h2 {
+            font-size: 18px;
+            color: #1e3c72;
+            margin-bottom: 12px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #2a5298;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 16px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 5px;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: normal;
+            font-size: 13px;
+        }
+
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-edit {
+            background: #e0e7ff;
+            color: #2a5298;
+        }
+
+        .btn-hapus {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 8px;
+            text-align: left;
+            border-bottom: 1px solid #eef2f6;
+            font-size: 13px;
+        }
+
+        th {
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        .badge-hari {
+            background: #e0e7ff;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            display: inline-block;
+            margin: 2px;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .main-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        .main-content::-webkit-scrollbar-track {
+            background: #e0e0e0;
+            border-radius: 4px;
+        }
+        .main-content::-webkit-scrollbar-thumb {
+            background: #2a5298;
+            border-radius: 4px;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>MEDKLIK</h2>
+            <p>Admin Panel</p>
+        </div>
+        
+        <div class="nav-menu">
+            <a href="dashboard.php" class="nav-item">Dashboard</a>
+            <a href="antrian.php" class="nav-item">Kelola Antrian</a>
+            <a href="kelola_poli.php" class="nav-item">Kelola Poli</a>
+            <a href="kelola_dokter.php" class="nav-item active">Kelola Dokter</a>
+            <a href="kelola_pasien.php" class="nav-item">Kelola Pasien</a>
+            <a href="laporan.php" class="nav-item">Laporan</a>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar">A</div>
+                <div>
+                    <div class="user-name">Admin</div>
+                    <div class="user-role">Administrator</div>
+                </div>
+            </div>
+            <a href="../logout.php" class="logout-btn">Logout</a>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+        <div class="welcome-card">
+            <h1>Kelola Data Dokter</h1>
+            <p>Tambah, edit, atau hapus data dokter</p>
+        </div>
+
+        <?php if ($success): ?>
+            <div class="alert alert-success"><?= $success ?></div>
+        <?php endif; ?>
+        <?php if ($error): ?>
+            <div class="alert alert-error"><?= $error ?></div>
+        <?php endif; ?>
+
+        <!-- Form Tambah Dokter -->
+        <div class="form-card">
+            <h2>Tambah Dokter Baru</h2>
+            <form method="POST">
+                <input type="hidden" name="action" value="tambah">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" name="username" placeholder="contoh: dr_bambang" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" name="password" placeholder="password" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nama Dokter</label>
+                        <input type="text" name="nama_dokter" placeholder="dr. Bambang, Sp.PD" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Spesialisasi</label>
+                        <input type="text" name="spesialisasi" placeholder="Penyakit Dalam">
+                    </div>
+                    <div class="form-group">
+                        <label>Pilih Poli</label>
+                        <select name="id_poli" required>
+                            <option value="">Pilih Poli</option>
+                            <?php 
+                            $poli_list2 = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
+                            while($poli = $poli_list2->fetch_assoc()): ?>
+                            <option value="<?= $poli['id_poli'] ?>"><?= htmlspecialchars($poli['nama_poli']) ?></option>
+                            <?php endwhile; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Jadwal Praktek</label>
+                    <div class="checkbox-group">
+                        <?php $hari_arr = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu']; ?>
+                        <?php foreach($hari_arr as $h): ?>
+                        <label><input type="checkbox" name="hari[]" value="<?= $h ?>"> <?= $h ?></label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Tambah Dokter</button>
+            </form>
+        </div>
+
+        <!-- Daftar Dokter -->
+        <div class="table-card">
+            <h2>Daftar Dokter</h2>
+            <div style="overflow-x: auto;">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Nama Dokter</th>
+                            <th>Spesialisasi</th>
+                            <th>Poli</th>
+                            <th>Jadwal</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php while($row = $dokter_list->fetch_assoc()): ?>
+                        <tr>
+                            <td><?= $row['id_dokter'] ?></td>
+                            <td><?= htmlspecialchars($row['username']) ?></td>
+                            <td><?= htmlspecialchars($row['nama_dokter']) ?></td>
+                            <td><?= htmlspecialchars($row['spesialisasi'] ?? '-') ?></td>
+                            <td><?= htmlspecialchars($row['nama_poli']) ?></td>
+                            <td>
+                                <?php 
+                                $jadwal = explode(', ', $row['hari_praktek'] ?? '');
+                                foreach($jadwal as $h): 
+                                    if($h): ?>
+                                        <span class="badge-hari"><?= $h ?></span>
+                                    <?php endif; 
+                                endforeach; 
+                                ?>
+                            </td>
+                            <td>
+                                <!-- Form Edit -->
+                                <form method="POST" style="display:inline-block;" onsubmit="return confirmEdit(this)">
+                                    <input type="hidden" name="action" value="edit">
+                                    <input type="hidden" name="id_dokter" value="<?= $row['id_dokter'] ?>">
+                                    <input type="text" name="nama_dokter" value="<?= htmlspecialchars($row['nama_dokter']) ?>" style="width:120px; padding:4px; margin-right:4px; border:1px solid #ddd; border-radius:4px;" required>
+                                    <input type="text" name="spesialisasi" value="<?= htmlspecialchars($row['spesialisasi'] ?? '') ?>" style="width:100px; padding:4px; margin-right:4px; border:1px solid #ddd; border-radius:4px;">
+                                    <select name="id_poli" style="width:100px; padding:4px; margin-right:4px; border:1px solid #ddd; border-radius:4px;">
+                                        <?php 
+                                        $poli_list3 = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
+                                        while($poli = $poli_list3->fetch_assoc()): ?>
+                                        <option value="<?= $poli['id_poli'] ?>" <?= $poli['id_poli'] == $row['id_poli'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($poli['nama_poli']) ?>
+                                        </option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                    <button type="submit" class="btn btn-edit" style="padding:4px 8px;">Edit</button>
+                                </form>
+                                <!-- Form Hapus -->
+                                <form method="POST" style="display:inline-block;" onsubmit="return confirm('Yakin ingin menghapus dokter <?= htmlspecialchars($row['nama_dokter']) ?>?')">
+                                    <input type="hidden" name="action" value="hapus">
+                                    <input type="hidden" name="id_dokter" value="<?= $row['id_dokter'] ?>">
+                                    <button type="submit" class="btn btn-hapus" style="padding:4px 8px;">Hapus</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function confirmEdit(form) {
+            return confirm('Yakin ingin mengedit data dokter ini?');
+        }
+    </script>
+</body>
+</html>
