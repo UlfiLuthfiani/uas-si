@@ -565,7 +565,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
 
                 <div class="form-group">
-                    <label>Metode Pembayaran</label>
+                    <label>Jenis Pasien</label>
                     <div class="radio-group">
                         <label>
                             <input type="radio" name="jenis_pasien" id="jenis_umum" value="Umum" <?= ($pasien['jenis_pasien'] ?? 'Umum') == 'Umum' ? 'checked' : '' ?>> Umum

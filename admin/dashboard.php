@@ -18,7 +18,6 @@ $total_reservasi = $conn->query("SELECT COUNT(*) as total FROM reservasi")->fetc
 
 // Ambil filter tanggal dari URL (opsional)
 $filter_tanggal = isset($_GET['tanggal']) ? $_GET['tanggal'] : '';
-$today = date('Y-m-d');
 
 if ($filter_tanggal) {
     $reservasi_list = $conn->query("
@@ -66,7 +65,6 @@ if ($filter_tanggal) {
             overflow: hidden;
         }
 
-        /* SIDEBAR */
         .sidebar {
             width: 260px;
             background: white;
@@ -174,7 +172,6 @@ if ($filter_tanggal) {
             font-weight: 500;
         }
 
-        /* MAIN CONTENT */
         .main-content {
             flex: 1;
             margin-left: 260px;
@@ -183,7 +180,6 @@ if ($filter_tanggal) {
             height: 100vh;
         }
 
-        /* Welcome Card */
         .welcome-card {
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             border-radius: 12px;
@@ -202,7 +198,6 @@ if ($filter_tanggal) {
             opacity: 0.85;
         }
 
-        /* Stats Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -230,21 +225,6 @@ if ($filter_tanggal) {
             color: #1e3c72;
         }
 
-        /* Table Card */
-        .table-card {
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            border: 1px solid #eef2f6;
-        }
-
-        .table-card h3 {
-            font-size: 14px;
-            color: #1e3c72;
-            margin-bottom: 12px;
-        }
-
-        /* Filter Box */
         .filter-box {
             background: white;
             border-radius: 12px;
@@ -297,6 +277,19 @@ if ($filter_tanggal) {
             text-decoration: none;
         }
 
+        .table-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #eef2f6;
+        }
+
+        .table-card h3 {
+            font-size: 14px;
+            color: #1e3c72;
+            margin-bottom: 12px;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -345,36 +338,17 @@ if ($filter_tanggal) {
         .main-content::-webkit-scrollbar {
             width: 4px;
         }
-        .main-content::-webkit-scrollbar-track {
-            background: #e0e0e0;
-            border-radius: 4px;
-        }
-        .main-content::-webkit-scrollbar-thumb {
-            background: #2a5298;
-            border-radius: 4px;
-        }
 
         @media (max-width: 768px) {
-            .sidebar {
-                display: none;
-            }
-            .main-content {
-                margin-left: 0;
-            }
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
 <body>
-    <!-- SIDEBAR -->
     <div class="sidebar">
-        <div class="sidebar-header">
-            <h2>MEDKLIK</h2>
-            <p>Admin Panel</p>
-        </div>
-        
+        <div class="sidebar-header"><h2>MEDKLIK</h2><p>Admin Panel</p></div>
         <div class="nav-menu">
             <a href="dashboard.php" class="nav-item active">Dashboard</a>
             <a href="antrian.php" class="nav-item">Kelola Antrian</a>
@@ -383,74 +357,38 @@ if ($filter_tanggal) {
             <a href="kelola_pasien.php" class="nav-item">Kelola Pasien</a>
             <a href="laporan.php" class="nav-item">Laporan</a>
         </div>
-
         <div class="sidebar-footer">
-            <div class="user-info">
-                <div class="user-avatar">A</div>
-                <div>
-                    <div class="user-name">Admin</div>
-                    <div class="user-role">Administrator</div>
-                </div>
-            </div>
+            <div class="user-info"><div class="user-avatar">A</div><div><div class="user-name">Admin</div><div class="user-role">Administrator</div></div></div>
             <a href="../logout.php" class="logout-btn">Logout</a>
         </div>
     </div>
 
-    <!-- MAIN CONTENT -->
     <div class="main-content">
         <div class="welcome-card">
             <h1>Dashboard Admin</h1>
             <p>Selamat datang di panel administrator MEDKLIK</p>
         </div>
 
-        <!-- Statistik -->
         <div class="stats-grid">
-            <div class="stat-card">
-                <h3>Total Pasien</h3>
-                <div class="value"><?= $total_pasien ?></div>
-            </div>
-            <div class="stat-card">
-                <h3>Total Dokter</h3>
-                <div class="value"><?= $total_dokter ?></div>
-            </div>
-            <div class="stat-card">
-                <h3>Total Poli</h3>
-                <div class="value"><?= $total_poli ?></div>
-            </div>
-            <div class="stat-card">
-                <h3>Total Pendaftaran</h3>
-                <div class="value"><?= $total_reservasi ?></div>
-            </div>
+            <div class="stat-card"><h3>Total Pasien</h3><div class="value"><?= $total_pasien ?></div></div>
+            <div class="stat-card"><h3>Total Dokter</h3><div class="value"><?= $total_dokter ?></div></div>
+            <div class="stat-card"><h3>Total Poli</h3><div class="value"><?= $total_poli ?></div></div>
+            <div class="stat-card"><h3>Total Pendaftaran</h3><div class="value"><?= $total_reservasi ?></div></div>
         </div>
 
-        <!-- Filter Tanggal -->
         <div class="filter-box">
-            <form method="GET" style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
-                <div class="filter-group">
-                    <label>Tanggal Periksa</label>
-                    <input type="date" name="tanggal" value="<?= $filter_tanggal ?>" placeholder="YYYY-MM-DD">
-                </div>
+            <form method="GET" style="display: flex; gap: 16px; align-items: flex-end;">
+                <div class="filter-group"><label>Tanggal Periksa</label><input type="date" name="tanggal" value="<?= $filter_tanggal ?>"></div>
                 <button type="submit" class="btn-filter">Filter</button>
-                <?php if ($filter_tanggal): ?>
-                    <a href="dashboard.php" class="btn-reset">Reset</a>
-                <?php endif; ?>
+                <?php if ($filter_tanggal): ?><a href="dashboard.php" class="btn-reset">Reset</a><?php endif; ?>
             </form>
         </div>
 
-        <!-- Tabel Pendaftaran -->
         <div class="table-card">
             <h3><?= $judul_tabel ?></h3>
             <div style="overflow-x: auto;">
                 <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Tanggal Periksa</th>
-                            <th>Pasien</th>
-                            <th>Poli</th>
-                            <th>Dokter</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Tanggal Periksa</th><th>Pasien</th><th>Poli</th><th>Dokter</th><th>Status</th></tr></thead>
                     <tbody>
                         <?php if ($reservasi_list->num_rows > 0): ?>
                             <?php while($row = $reservasi_list->fetch_assoc()): ?>
@@ -459,24 +397,11 @@ if ($filter_tanggal) {
                                 <td><?= htmlspecialchars($row['nama_lengkap']) ?></td>
                                 <td><?= htmlspecialchars($row['nama_poli']) ?></td>
                                 <td><?= htmlspecialchars($row['nama_dokter']) ?></td>
-                                <td>
-                                    <?php 
-                                    $status = $row['status_reservasi'];
-                                    if ($status == 'menunggu') {
-                                        echo '<span class="badge badge-menunggu">Menunggu</span>';
-                                    } elseif ($status == 'dipanggil') {
-                                        echo '<span class="badge badge-dipanggil">Dipanggil</span>';
-                                    } else {
-                                        echo '<span class="badge badge-selesai">Selesai</span>';
-                                    }
-                                    ?>
-                                </td>
+                                <td><span class="badge badge-<?= $row['status_reservasi'] ?>"><?= ucfirst($row['status_reservasi']) ?></span></td>
                             </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
-                            <tr>
-                                <td colspan="5" class="empty-state">Belum ada pendaftaran<?= $filter_tanggal ? ' pada tanggal ' . date('d/m/Y', strtotime($filter_tanggal)) : '' ?></td>
-                            </tr>
+                            <tr><td colspan="5" class="empty-state">Belum ada pendaftaran</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>

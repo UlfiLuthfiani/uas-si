@@ -18,41 +18,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $spesialisasi = $conn->real_escape_string($_POST['spesialisasi']);
         $id_poli = intval($_POST['id_poli']);
         
-        // Cek username sudah ada
         $check = $conn->query("SELECT * FROM users WHERE username = '$username'");
         if ($check->num_rows > 0) {
             $error = "Username sudah digunakan!";
         } else {
-            // Insert ke users
-            $conn->query("INSERT INTO users (username, password, role) VALUES ('$username', '$password', 'dokter')");
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            
+            $conn->query("INSERT INTO users (username, password, role) VALUES ('$username', '$hashed_password', 'dokter')");
             $id_user = $conn->insert_id;
             
-            // Insert ke dokter
             $conn->query("INSERT INTO dokter (id_user, nama_dokter, spesialisasi, id_poli) 
                           VALUES ('$id_user', '$nama_dokter', '$spesialisasi', '$id_poli')");
             $id_dokter = $conn->insert_id;
             
-            // Insert jadwal
             if (isset($_POST['hari']) && !empty($_POST['hari'])) {
                 foreach ($_POST['hari'] as $hari) {
                     $conn->query("INSERT INTO jadwal_dokter (id_dokter, hari) VALUES ('$id_dokter', '$hari')");
                 }
             }
             $success = "Dokter berhasil ditambahkan!";
+            header("Location: kelola_dokter.php?success=1");
+            exit();
         }
     }
     
-    // Proses Edit Dokter
+    // Proses Edit Dokter via Modal
     if ($_POST['action'] == 'edit') {
         $id_dokter = intval($_POST['id_dokter']);
         $nama_dokter = $conn->real_escape_string($_POST['nama_dokter']);
         $spesialisasi = $conn->real_escape_string($_POST['spesialisasi']);
         $id_poli = intval($_POST['id_poli']);
+        $new_password = isset($_POST['password']) ? $_POST['password'] : '';
         
         $conn->query("UPDATE dokter SET nama_dokter = '$nama_dokter', spesialisasi = '$spesialisasi', id_poli = '$id_poli' 
                       WHERE id_dokter = '$id_dokter'");
         
-        // Update jadwal (hapus lama, insert baru)
+        if (!empty($new_password)) {
+            $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+            $dokter = $conn->query("SELECT id_user FROM dokter WHERE id_dokter = '$id_dokter'")->fetch_assoc();
+            $id_user = $dokter['id_user'];
+            $conn->query("UPDATE users SET password = '$hashed_password' WHERE id_user = '$id_user'");
+        }
+        
+        // Update jadwal
         $conn->query("DELETE FROM jadwal_dokter WHERE id_dokter = '$id_dokter'");
         if (isset($_POST['hari']) && !empty($_POST['hari'])) {
             foreach ($_POST['hari'] as $hari) {
@@ -60,26 +68,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             }
         }
         $success = "Dokter berhasil diupdate!";
+        header("Location: kelola_dokter.php?success=1");
+        exit();
     }
     
     // Proses Hapus Dokter
     if ($_POST['action'] == 'hapus') {
         $id_dokter = intval($_POST['id_dokter']);
-        
-        // Ambil id_user
         $dokter = $conn->query("SELECT id_user FROM dokter WHERE id_dokter = '$id_dokter'")->fetch_assoc();
         $id_user = $dokter['id_user'];
         
-        // Hapus data terkait
         $conn->query("DELETE FROM jadwal_dokter WHERE id_dokter = '$id_dokter'");
         $conn->query("DELETE FROM dokter WHERE id_dokter = '$id_dokter'");
         $conn->query("DELETE FROM users WHERE id_user = '$id_user'");
         
         $success = "Dokter berhasil dihapus!";
+        header("Location: kelola_dokter.php?success=1");
+        exit();
     }
 }
 
-// Ambil data dokter dengan jadwal
+// Ambil data dokter
 $dokter_list = $conn->query("
     SELECT d.*, u.username, p.nama_poli,
            GROUP_CONCAT(j.hari ORDER BY FIELD(j.hari, 'Senin','Selasa','Rabu','Kamis','Jumat','Sabtu') SEPARATOR ', ') as hari_praktek
@@ -91,8 +100,23 @@ $dokter_list = $conn->query("
     ORDER BY d.id_dokter
 ");
 
-// Ambil daftar poli untuk dropdown
 $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
+
+// Ambil data untuk modal edit
+$edit_dokter = null;
+if (isset($_GET['edit'])) {
+    $id_edit = intval($_GET['edit']);
+    $edit_dokter = $conn->query("
+        SELECT d.*, u.username, p.nama_poli,
+               GROUP_CONCAT(j.hari ORDER BY FIELD(j.hari, 'Senin','Selasa','Rabu','Kamis','Jumat','Sabtu') SEPARATOR ', ') as hari_praktek
+        FROM dokter d
+        JOIN users u ON d.id_user = u.id_user
+        JOIN poli p ON d.id_poli = p.id_poli
+        LEFT JOIN jadwal_dokter j ON d.id_dokter = j.id_dokter
+        WHERE d.id_dokter = '$id_edit'
+        GROUP BY d.id_dokter
+    ")->fetch_assoc();
+}
 ?>
 
 <!DOCTYPE html>
@@ -116,7 +140,6 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
             overflow: hidden;
         }
 
-        /* SIDEBAR */
         .sidebar {
             width: 260px;
             background: white;
@@ -224,7 +247,6 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
             font-weight: 500;
         }
 
-        /* MAIN CONTENT */
         .main-content {
             flex: 1;
             margin-left: 260px;
@@ -233,7 +255,6 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
             height: 100vh;
         }
 
-        /* Welcome Card */
         .welcome-card {
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             border-radius: 12px;
@@ -252,7 +273,6 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
             opacity: 0.85;
         }
 
-        /* Form Card */
         .form-card {
             background: white;
             border-radius: 12px;
@@ -267,7 +287,6 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
             margin-bottom: 16px;
         }
 
-        /* Table Card */
         .table-card {
             background: white;
             border-radius: 12px;
@@ -302,19 +321,9 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
             font-size: 13px;
         }
 
-        .form-group input:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: #2a5298;
-        }
-
         .form-row {
             display: flex;
             gap: 16px;
-        }
-
-        .form-row .form-group {
-            flex: 1;
         }
 
         .checkbox-group {
@@ -339,26 +348,39 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
             cursor: pointer;
             font-size: 12px;
             font-weight: 500;
-            transition: all 0.3s;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
             color: white;
         }
 
-        .btn-primary:hover {
-            transform: translateY(-1px);
-        }
-
+        /* Tombol Edit seperti di kelola pasien */
         .btn-edit {
             background: #e0e7ff;
             color: #2a5298;
+            display: inline-block;
+            padding: 4px 10px;
+            margin: 2px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            text-decoration: none;
+            border: none;
+            font-weight: 500;
         }
 
         .btn-hapus {
             background: #fee2e2;
             color: #dc2626;
+            display: inline-block;
+            padding: 4px 10px;
+            margin: 2px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            border: none;
+            font-weight: 500;
         }
 
         table {
@@ -367,10 +389,10 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
         }
 
         th, td {
-            padding: 12px 8px;
+            padding: 10px 8px;
             text-align: left;
             border-bottom: 1px solid #eef2f6;
-            font-size: 13px;
+            font-size: 12px;
         }
 
         th {
@@ -404,40 +426,80 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
             color: #dc2626;
         }
 
+        .action-buttons {
+            white-space: nowrap;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-content h3 {
+            font-size: 18px;
+            color: #1e3c72;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #eef2f6;
+            padding-bottom: 12px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            justify-content: flex-end;
+        }
+
+        .btn-simpan {
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .btn-batal {
+            background: #f1f3f5;
+            color: #495057;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
         .main-content::-webkit-scrollbar {
             width: 4px;
         }
-        .main-content::-webkit-scrollbar-track {
-            background: #e0e0e0;
-            border-radius: 4px;
-        }
-        .main-content::-webkit-scrollbar-thumb {
-            background: #2a5298;
-            border-radius: 4px;
-        }
 
         @media (max-width: 768px) {
-            .sidebar {
-                display: none;
-            }
-            .main-content {
-                margin-left: 0;
-            }
-            .form-row {
-                flex-direction: column;
-                gap: 0;
-            }
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+            .form-row { flex-direction: column; }
         }
     </style>
 </head>
 <body>
-    <!-- SIDEBAR -->
     <div class="sidebar">
-        <div class="sidebar-header">
-            <h2>MEDKLIK</h2>
-            <p>Admin Panel</p>
-        </div>
-        
+        <div class="sidebar-header"><h2>MEDKLIK</h2><p>Admin Panel</p></div>
         <div class="nav-menu">
             <a href="dashboard.php" class="nav-item">Dashboard</a>
             <a href="antrian.php" class="nav-item">Kelola Antrian</a>
@@ -446,28 +508,20 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
             <a href="kelola_pasien.php" class="nav-item">Kelola Pasien</a>
             <a href="laporan.php" class="nav-item">Laporan</a>
         </div>
-
         <div class="sidebar-footer">
-            <div class="user-info">
-                <div class="user-avatar">A</div>
-                <div>
-                    <div class="user-name">Admin</div>
-                    <div class="user-role">Administrator</div>
-                </div>
-            </div>
+            <div class="user-info"><div class="user-avatar">A</div><div><div class="user-name">Admin</div><div class="user-role">Administrator</div></div></div>
             <a href="../logout.php" class="logout-btn">Logout</a>
         </div>
     </div>
 
-    <!-- MAIN CONTENT -->
     <div class="main-content">
         <div class="welcome-card">
             <h1>Kelola Data Dokter</h1>
             <p>Tambah, edit, atau hapus data dokter</p>
         </div>
 
-        <?php if ($success): ?>
-            <div class="alert alert-success"><?= $success ?></div>
+        <?php if (isset($_GET['success'])): ?>
+            <div class="alert alert-success">Operasi berhasil dilakukan!</div>
         <?php endif; ?>
         <?php if ($error): ?>
             <div class="alert alert-error"><?= $error ?></div>
@@ -479,31 +533,16 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
             <form method="POST">
                 <input type="hidden" name="action" value="tambah">
                 <div class="form-row">
-                    <div class="form-group">
-                        <label>Username</label>
-                        <input type="text" name="username" placeholder="contoh: dr_bambang" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Password</label>
-                        <input type="password" name="password" placeholder="password" required>
-                    </div>
+                    <div class="form-group"><label>Username</label><input type="text" name="username" placeholder="dr_bambang" required></div>
+                    <div class="form-group"><label>Password</label><input type="password" name="password" placeholder="password" required></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group">
-                        <label>Nama Dokter</label>
-                        <input type="text" name="nama_dokter" placeholder="dr. Bambang, Sp.PD" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Spesialisasi</label>
-                        <input type="text" name="spesialisasi" placeholder="Penyakit Dalam">
-                    </div>
-                    <div class="form-group">
-                        <label>Pilih Poli</label>
+                    <div class="form-group"><label>Nama Dokter</label><input type="text" name="nama_dokter" placeholder="dr. Bambang, Sp.PD" required></div>
+                    <div class="form-group"><label>Spesialisasi</label><input type="text" name="spesialisasi" placeholder="Penyakit Dalam"></div>
+                    <div class="form-group"><label>Pilih Poli</label>
                         <select name="id_poli" required>
                             <option value="">Pilih Poli</option>
-                            <?php 
-                            $poli_list2 = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
-                            while($poli = $poli_list2->fetch_assoc()): ?>
+                            <?php $poli_list2 = $conn->query("SELECT * FROM poli ORDER BY nama_poli"); while($poli = $poli_list2->fetch_assoc()): ?>
                             <option value="<?= $poli['id_poli'] ?>"><?= htmlspecialchars($poli['nama_poli']) ?></option>
                             <?php endwhile; ?>
                         </select>
@@ -547,38 +586,16 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
                             <td><?= htmlspecialchars($row['spesialisasi'] ?? '-') ?></td>
                             <td><?= htmlspecialchars($row['nama_poli']) ?></td>
                             <td>
-                                <?php 
-                                $jadwal = explode(', ', $row['hari_praktek'] ?? '');
-                                foreach($jadwal as $h): 
-                                    if($h): ?>
-                                        <span class="badge-hari"><?= $h ?></span>
-                                    <?php endif; 
-                                endforeach; 
-                                ?>
+                                <?php $jadwal = explode(', ', $row['hari_praktek'] ?? ''); foreach($jadwal as $h): if($h): ?>
+                                <span class="badge-hari"><?= $h ?></span>
+                                <?php endif; endforeach; ?>
                             </td>
-                            <td>
-                                <!-- Form Edit -->
-                                <form method="POST" style="display:inline-block;" onsubmit="return confirmEdit(this)">
-                                    <input type="hidden" name="action" value="edit">
-                                    <input type="hidden" name="id_dokter" value="<?= $row['id_dokter'] ?>">
-                                    <input type="text" name="nama_dokter" value="<?= htmlspecialchars($row['nama_dokter']) ?>" style="width:120px; padding:4px; margin-right:4px; border:1px solid #ddd; border-radius:4px;" required>
-                                    <input type="text" name="spesialisasi" value="<?= htmlspecialchars($row['spesialisasi'] ?? '') ?>" style="width:100px; padding:4px; margin-right:4px; border:1px solid #ddd; border-radius:4px;">
-                                    <select name="id_poli" style="width:100px; padding:4px; margin-right:4px; border:1px solid #ddd; border-radius:4px;">
-                                        <?php 
-                                        $poli_list3 = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
-                                        while($poli = $poli_list3->fetch_assoc()): ?>
-                                        <option value="<?= $poli['id_poli'] ?>" <?= $poli['id_poli'] == $row['id_poli'] ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($poli['nama_poli']) ?>
-                                        </option>
-                                        <?php endwhile; ?>
-                                    </select>
-                                    <button type="submit" class="btn btn-edit" style="padding:4px 8px;">Edit</button>
-                                </form>
-                                <!-- Form Hapus -->
+                            <td class="action-buttons">
+                                <a href="?edit=<?= $row['id_dokter'] ?>" class="btn-edit">Edit</a>
                                 <form method="POST" style="display:inline-block;" onsubmit="return confirm('Yakin ingin menghapus dokter <?= htmlspecialchars($row['nama_dokter']) ?>?')">
                                     <input type="hidden" name="action" value="hapus">
                                     <input type="hidden" name="id_dokter" value="<?= $row['id_dokter'] ?>">
-                                    <button type="submit" class="btn btn-hapus" style="padding:4px 8px;">Hapus</button>
+                                    <button type="submit" class="btn-hapus">Hapus</button>
                                 </form>
                             </td>
                         </tr>
@@ -589,10 +606,62 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
         </div>
     </div>
 
-    <script>
-        function confirmEdit(form) {
-            return confirm('Yakin ingin mengedit data dokter ini?');
-        }
-    </script>
+    <!-- Modal Edit Dokter -->
+    <?php if ($edit_dokter): ?>
+    <div class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3>Edit Data Dokter</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="edit">
+                <input type="hidden" name="id_dokter" value="<?= $edit_dokter['id_dokter'] ?>">
+                
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" value="<?= htmlspecialchars($edit_dokter['username']) ?>" disabled style="background:#f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>Nama Dokter</label>
+                    <input type="text" name="nama_dokter" value="<?= htmlspecialchars($edit_dokter['nama_dokter']) ?>" required>
+                </div>
+                <div class="form-group">
+                    <label>Spesialisasi</label>
+                    <input type="text" name="spesialisasi" value="<?= htmlspecialchars($edit_dokter['spesialisasi'] ?? '') ?>">
+                </div>
+                <div class="form-group">
+                    <label>Poli</label>
+                    <select name="id_poli" required>
+                        <?php $poli_list3 = $conn->query("SELECT * FROM poli ORDER BY nama_poli"); while($p = $poli_list3->fetch_assoc()): ?>
+                        <option value="<?= $p['id_poli'] ?>" <?= $p['id_poli'] == $edit_dokter['id_poli'] ? 'selected' : '' ?>><?= htmlspecialchars($p['nama_poli']) ?></option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Password Baru (kosongkan jika tidak diubah)</label>
+                    <input type="password" name="password" placeholder="Masukkan password baru">
+                </div>
+                <div class="form-group">
+                    <label>Jadwal Praktek</label>
+                    <div class="checkbox-group">
+                        <?php 
+                        $hari_arr = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+                        $jadwal_edit = explode(', ', $edit_dokter['hari_praktek'] ?? '');
+                        foreach($hari_arr as $h): 
+                        ?>
+                        <label>
+                            <input type="checkbox" name="hari[]" value="<?= $h ?>" <?= in_array($h, $jadwal_edit) ? 'checked' : '' ?>>
+                            <?= $h ?>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="submit" class="btn-simpan">Simpan</button>
+                    <a href="kelola_dokter.php" class="btn-batal">Batal</a>
+                </div>
+            </form>
+        </div>
+    </div>
+    <?php endif; ?>
 </body>
 </html>

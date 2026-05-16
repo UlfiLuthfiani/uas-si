@@ -464,7 +464,7 @@ if (isset($_GET['id'])) {
                             <span class="jadwal-item">Jadwal belum ditentukan</span>
                         <?php endif; ?>
                     </div>
-                    <div class="jam-layanan">Pelayanan: Senin - Sabtu (08:00 - 15:00) | Minggu & Hari Libur Tutup</div>
+                    <div class="jam-layanan">Pelayanan: Senin - Sabtu (08:00 - 12:00) | Minggu & Hari Libur Tutup</div>
                 </div>
                 <?php endwhile; ?>
             <?php else: ?>

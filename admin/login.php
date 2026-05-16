@@ -18,12 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if ($result->num_rows > 0) {
         $user = $result->fetch_assoc();
         
-        if ($password == $user['password']) {
+        // ========== PERBAIKAN: Gunakan password_verify ==========
+        if (password_verify($password, $user['password'])) {
             $_SESSION['user_id'] = $user['id_user'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['role'] = $user['role'];
             
-            // Redirect ke dashboard admin
             header('Location: dashboard.php');
             exit();
         } else {
@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </form>
 
         <div class="back-link">
-            <a href="../index.php"> Kembali ke Beranda</a>
+            <a href="../index.php">Kembali ke Beranda</a>
         </div>
     </div>
 </body>

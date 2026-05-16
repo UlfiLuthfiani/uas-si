@@ -38,11 +38,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if ($check_email->num_rows > 0) {
                 $error = 'Email sudah terdaftar!';
             } else {
+                // Hash password
+                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+                
                 // Insert ke users
-                $conn->query("INSERT INTO users (username, password, role) VALUES ('$username', '$password', 'pasien')");
+                $conn->query("INSERT INTO users (username, password, role) VALUES ('$username', '$hashed_password', 'pasien')");
                 $id_user = $conn->insert_id;
                 
-                // Insert ke pasien (termasuk no_bpjs jika BPJS)
+                // Insert ke pasien
                 $sql = "INSERT INTO pasien (id_user, nama_lengkap, nik, email, tanggal_lahir, alamat, no_hp, jenis_kelamin, jenis_pasien, no_bpjs) 
                         VALUES ('$id_user', '$nama_lengkap', '$nik', '$email', '$tanggal_lahir', '$alamat', '$no_hp', '$jenis_kelamin', '$jenis_pasien', " . ($no_bpjs ? "'$no_bpjs'" : "NULL") . ")";
                 
@@ -223,13 +226,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             color: #059669;
         }
 
-        .footer-date {
-            text-align: center;
-            margin-top: 16px;
-            font-size: 10px;
-            color: #adb5bd;
-        }
-
         .no-bpjs-field {
             transition: all 0.3s ease;
         }
@@ -363,10 +359,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         <div class="login-link">
             <p>Sudah punya akun? <a href="../pasien/login.php">Login</a></p>
-        </div>
-
-        <div class="footer-date">
-            <?= date('H:i') ?> | <?= date('d/m/Y') ?>
         </div>
     </div>
 

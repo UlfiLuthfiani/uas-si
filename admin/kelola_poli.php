@@ -23,10 +23,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             $conn->query("INSERT INTO poli (nama_poli, kuota_harian, durasi_pemeriksaan) 
                           VALUES ('$nama_poli', '$kuota_harian', '$durasi_pemeriksaan')");
             $success = "Poli berhasil ditambahkan!";
+            header("Location: kelola_poli.php?success=1");
+            exit();
         }
     }
     
-    // Proses Edit Poli
+    // Proses Edit Poli via Modal
     if ($_POST['action'] == 'edit') {
         $id_poli = intval($_POST['id_poli']);
         $nama_poli = $conn->real_escape_string($_POST['nama_poli']);
@@ -36,6 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $conn->query("UPDATE poli SET nama_poli = '$nama_poli', kuota_harian = '$kuota_harian', durasi_pemeriksaan = '$durasi_pemeriksaan' 
                       WHERE id_poli = '$id_poli'");
         $success = "Poli berhasil diupdate!";
+        header("Location: kelola_poli.php?success=1");
+        exit();
     }
     
     // Proses Hapus Poli
@@ -45,15 +49,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $cek_dokter = $conn->query("SELECT * FROM dokter WHERE id_poli = '$id_poli'");
         if ($cek_dokter->num_rows > 0) {
             $error = "Tidak bisa menghapus poli karena masih memiliki dokter!";
+            header("Location: kelola_poli.php?error=1");
+            exit();
         } else {
             $conn->query("DELETE FROM poli WHERE id_poli = '$id_poli'");
             $success = "Poli berhasil dihapus!";
+            header("Location: kelola_poli.php?success=1");
+            exit();
         }
     }
 }
 
 // Ambil semua data poli
 $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
+
+// Ambil data untuk modal edit
+$edit_poli = null;
+if (isset($_GET['edit'])) {
+    $id_edit = intval($_GET['edit']);
+    $edit_poli = $conn->query("SELECT * FROM poli WHERE id_poli = '$id_edit'")->fetch_assoc();
+}
 ?>
 
 <!DOCTYPE html>
@@ -77,7 +92,6 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
             overflow: hidden;
         }
 
-        /* SIDEBAR - Sama dengan dashboard */
         .sidebar {
             width: 260px;
             background: white;
@@ -185,7 +199,6 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
             font-weight: 500;
         }
 
-        /* MAIN CONTENT */
         .main-content {
             flex: 1;
             margin-left: 260px;
@@ -194,7 +207,6 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
             height: 100vh;
         }
 
-        /* Welcome Card */
         .welcome-card {
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             border-radius: 12px;
@@ -213,7 +225,6 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
             opacity: 0.85;
         }
 
-        /* Form Card */
         .form-card {
             background: white;
             border-radius: 12px;
@@ -228,7 +239,6 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
             margin-bottom: 16px;
         }
 
-        /* Table Card */
         .table-card {
             background: white;
             border-radius: 12px;
@@ -262,11 +272,6 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
             font-size: 13px;
         }
 
-        .form-group input:focus {
-            outline: none;
-            border-color: #2a5298;
-        }
-
         .form-row {
             display: flex;
             gap: 16px;
@@ -276,33 +281,16 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
             flex: 1;
         }
 
-        .btn {
-            padding: 8px 20px;
+        .btn-primary {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
             border: none;
+            padding: 8px 20px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 12px;
             font-weight: 500;
-            transition: all 0.3s;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-1px);
-        }
-
-        .btn-edit {
-            background: #e0e7ff;
-            color: #2a5298;
-        }
-
-        .btn-hapus {
-            background: #fee2e2;
-            color: #dc2626;
+            margin-top: 10px;
         }
 
         table {
@@ -311,15 +299,46 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
         }
 
         th, td {
-            padding: 12px 8px;
+            padding: 10px 8px;
             text-align: left;
             border-bottom: 1px solid #eef2f6;
-            font-size: 13px;
+            font-size: 12px;
         }
 
         th {
             color: #6c757d;
             font-weight: 500;
+        }
+
+        .btn-edit {
+            background: #e0e7ff;
+            color: #2a5298;
+            display: inline-block;
+            padding: 4px 10px;
+            margin: 2px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            text-decoration: none;
+            border: none;
+            font-weight: 500;
+        }
+
+        .btn-hapus {
+            background: #fee2e2;
+            color: #dc2626;
+            display: inline-block;
+            padding: 4px 10px;
+            margin: 2px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            border: none;
+            font-weight: 500;
+        }
+
+        .action-buttons {
+            white-space: nowrap;
         }
 
         .alert {
@@ -339,40 +358,75 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
             color: #dc2626;
         }
 
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 450px;
+            width: 90%;
+        }
+
+        .modal-content h3 {
+            font-size: 18px;
+            color: #1e3c72;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #eef2f6;
+            padding-bottom: 12px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            justify-content: flex-end;
+        }
+
+        .btn-simpan {
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .btn-batal {
+            background: #f1f3f5;
+            color: #495057;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
         .main-content::-webkit-scrollbar {
             width: 4px;
         }
-        .main-content::-webkit-scrollbar-track {
-            background: #e0e0e0;
-            border-radius: 4px;
-        }
-        .main-content::-webkit-scrollbar-thumb {
-            background: #2a5298;
-            border-radius: 4px;
-        }
 
         @media (max-width: 768px) {
-            .sidebar {
-                display: none;
-            }
-            .main-content {
-                margin-left: 0;
-            }
-            .form-row {
-                flex-direction: column;
-                gap: 0;
-            }
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+            .form-row { flex-direction: column; }
         }
     </style>
 </head>
 <body>
-    <!-- SIDEBAR -->
     <div class="sidebar">
-        <div class="sidebar-header">
-            <h2>MEDKLIK</h2>
-            <p>Admin Panel</p>
-        </div>
-        
+        <div class="sidebar-header"><h2>MEDKLIK</h2><p>Admin Panel</p></div>
         <div class="nav-menu">
             <a href="dashboard.php" class="nav-item">Dashboard</a>
             <a href="antrian.php" class="nav-item">Kelola Antrian</a>
@@ -381,57 +435,38 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
             <a href="kelola_pasien.php" class="nav-item">Kelola Pasien</a>
             <a href="laporan.php" class="nav-item">Laporan</a>
         </div>
-
         <div class="sidebar-footer">
-            <div class="user-info">
-                <div class="user-avatar">A</div>
-                <div>
-                    <div class="user-name">Admin</div>
-                    <div class="user-role">Administrator</div>
-                </div>
-            </div>
+            <div class="user-info"><div class="user-avatar">A</div><div><div class="user-name">Admin</div><div class="user-role">Administrator</div></div></div>
             <a href="../logout.php" class="logout-btn">Logout</a>
         </div>
     </div>
 
-    <!-- MAIN CONTENT -->
     <div class="main-content">
         <div class="welcome-card">
             <h1>Kelola Data Poli</h1>
             <p>Tambah, edit, atau hapus data poli</p>
         </div>
 
-        <?php if ($success): ?>
-            <div class="alert alert-success"><?= $success ?></div>
+        <?php if (isset($_GET['success'])): ?>
+            <div class="alert alert-success">Operasi berhasil dilakukan!</div>
         <?php endif; ?>
-        <?php if ($error): ?>
-            <div class="alert alert-error"><?= $error ?></div>
+        <?php if (isset($_GET['error'])): ?>
+            <div class="alert alert-error">Tidak bisa menghapus poli karena masih memiliki dokter!</div>
         <?php endif; ?>
 
-        <!-- Form Tambah Poli -->
         <div class="form-card">
             <h2>Tambah Poli Baru</h2>
             <form method="POST">
                 <input type="hidden" name="action" value="tambah">
                 <div class="form-row">
-                    <div class="form-group">
-                        <label>Nama Poli</label>
-                        <input type="text" name="nama_poli" placeholder="Contoh: Poli Mata" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Kuota Harian</label>
-                        <input type="number" name="kuota_harian" value="20" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Durasi Pemeriksaan (menit)</label>
-                        <input type="number" name="durasi_pemeriksaan" value="15" required>
-                    </div>
+                    <div class="form-group"><label>Nama Poli</label><input type="text" name="nama_poli" placeholder="Contoh: Poli Mata" required></div>
+                    <div class="form-group"><label>Kuota Harian</label><input type="number" name="kuota_harian" value="20" required></div>
+                    <div class="form-group"><label>Durasi Pemeriksaan (menit)</label><input type="number" name="durasi_pemeriksaan" value="15" required></div>
                 </div>
-                <button type="submit" class="btn btn-primary">Tambah Poli</button>
+                <button type="submit" class="btn-primary">Tambah Poli</button>
             </form>
         </div>
 
-        <!-- Daftar Poli -->
         <div class="table-card">
             <h2>Daftar Poli</h2>
             <div style="overflow-x: auto;">
@@ -452,19 +487,12 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
                             <td><?= htmlspecialchars($row['nama_poli']) ?></td>
                             <td><?= $row['kuota_harian'] ?> pasien</td>
                             <td><?= $row['durasi_pemeriksaan'] ?> menit</td>
-                            <td>
-                                <form method="POST" style="display:inline-block;">
-                                    <input type="hidden" name="action" value="edit">
-                                    <input type="hidden" name="id_poli" value="<?= $row['id_poli'] ?>">
-                                    <input type="text" name="nama_poli" value="<?= htmlspecialchars($row['nama_poli']) ?>" style="width:100px; padding:4px; margin-right:4px; border:1px solid #ddd; border-radius:4px;" required>
-                                    <input type="number" name="kuota_harian" value="<?= $row['kuota_harian'] ?>" style="width:60px; padding:4px; margin-right:4px; border:1px solid #ddd; border-radius:4px;" required>
-                                    <input type="number" name="durasi_pemeriksaan" value="<?= $row['durasi_pemeriksaan'] ?>" style="width:60px; padding:4px; margin-right:4px; border:1px solid #ddd; border-radius:4px;" required>
-                                    <button type="submit" class="btn btn-edit" style="padding:4px 8px;">Edit</button>
-                                </form>
+                            <td class="action-buttons">
+                                <a href="?edit=<?= $row['id_poli'] ?>" class="btn-edit">Edit</a>
                                 <form method="POST" style="display:inline-block;" onsubmit="return confirm('Yakin ingin menghapus poli <?= htmlspecialchars($row['nama_poli']) ?>?')">
                                     <input type="hidden" name="action" value="hapus">
                                     <input type="hidden" name="id_poli" value="<?= $row['id_poli'] ?>">
-                                    <button type="submit" class="btn btn-hapus" style="padding:4px 8px;">Hapus</button>
+                                    <button type="submit" class="btn-hapus">Hapus</button>
                                 </form>
                             </td>
                         </tr>
@@ -474,5 +502,26 @@ $poli_list = $conn->query("SELECT * FROM poli ORDER BY id_poli");
             </div>
         </div>
     </div>
+
+    <?php if ($edit_poli): ?>
+    <div class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3>Edit Data Poli</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="edit">
+                <input type="hidden" name="id_poli" value="<?= $edit_poli['id_poli'] ?>">
+                
+                <div class="form-group"><label>Nama Poli</label><input type="text" name="nama_poli" value="<?= htmlspecialchars($edit_poli['nama_poli']) ?>" required></div>
+                <div class="form-group"><label>Kuota Harian</label><input type="number" name="kuota_harian" value="<?= $edit_poli['kuota_harian'] ?>" required></div>
+                <div class="form-group"><label>Durasi Pemeriksaan (menit)</label><input type="number" name="durasi_pemeriksaan" value="<?= $edit_poli['durasi_pemeriksaan'] ?>" required></div>
+                
+                <div class="modal-actions">
+                    <button type="submit" class="btn-simpan">Simpan</button>
+                    <a href="kelola_poli.php" class="btn-batal">Batal</a>
+                </div>
+            </form>
+        </div>
+    </div>
+    <?php endif; ?>
 </body>
 </html>

@@ -399,7 +399,6 @@ $riwayat_antrian = $conn->query("
             <div class="antrian-card">
                 <div class="antrian-header">
                     <h3>MEDKLIK RESERVASI</h3>
-                    <h2>KLINIK PRATAMA DIGITAL</h2>
                 </div>
                 <div class="badge-terdaftar">TERDAFTAR</div>
                 <div class="nomor-antrian-box">

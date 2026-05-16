@@ -9,7 +9,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
 $error = '';
 $success = '';
 
-// Proses update status antrian
+// Proses update status antrian (Admin hanya bisa panggil, tidak bisa selesai)
 if (isset($_GET['panggil'])) {
     $id_reservasi = intval($_GET['panggil']);
     $conn->query("UPDATE antrian SET status_antrian = 'dipanggil' WHERE id_reservasi = '$id_reservasi'");
@@ -19,14 +19,8 @@ if (isset($_GET['panggil'])) {
     exit();
 }
 
-if (isset($_GET['selesai'])) {
-    $id_reservasi = intval($_GET['selesai']);
-    $conn->query("UPDATE antrian SET status_antrian = 'selesai' WHERE id_reservasi = '$id_reservasi'");
-    $conn->query("UPDATE reservasi SET status_reservasi = 'selesai' WHERE id_reservasi = '$id_reservasi'");
-    $success = "Status berhasil diubah menjadi Selesai";
-    header("Location: antrian.php");
-    exit();
-}
+// HAPUS PROSES SELESAI (Admin tidak boleh selesai)
+// if (isset($_GET['selesai'])) { ... }
 
 // Filter berdasarkan poli
 $filter_poli = isset($_GET['poli']) ? intval($_GET['poli']) : 0;
@@ -34,7 +28,7 @@ $filter_poli = isset($_GET['poli']) ? intval($_GET['poli']) : 0;
 // Ambil semua poli untuk dropdown filter
 $poli_list = $conn->query("SELECT * FROM poli ORDER BY nama_poli");
 
-// Query ambil antrian (SEMUA DATA, tidak hanya hari ini)
+// Query ambil antrian
 $query = "
     SELECT r.id_reservasi, r.tanggal_periksa, r.keluhan,
            a.nomor_antrian, a.status_antrian,
@@ -225,7 +219,7 @@ $antrian_list = $conn->query($query);
 
         .filter-group {
             display: flex;
-            flex-direction: columns;
+            flex-direction: column;
             gap: 6px;
         }
 
@@ -335,26 +329,6 @@ $antrian_list = $conn->query($query);
         .btn-panggil:hover {
             transform: translateY(-1px);
             box-shadow: 0 2px 8px rgba(30,60,114,0.3);
-        }
-
-        .btn-selesai {
-            background: #10b981;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 11px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            margin: 2px;
-            min-width: 60px;
-            text-align: center;
-            transition: all 0.3s;
-        }
-
-        .btn-selesai:hover {
-            background: #059669;
         }
 
         .btn-lihat {
@@ -507,8 +481,6 @@ $antrian_list = $conn->query($query);
                                         echo '<span class="badge badge-menunggu">Menunggu</span>';
                                     } elseif ($status == 'dipanggil') {
                                         echo '<span class="badge badge-dipanggil">Dipanggil</span>';
-                                    } elseif ($status == 'selesai') {
-                                        echo '<span class="badge badge-selesai">Selesai</span>';
                                     } else {
                                         echo '<span class="badge badge-selesai">Selesai</span>';
                                     }
@@ -518,11 +490,9 @@ $antrian_list = $conn->query($query);
                                     <?php if ($row['status_antrian'] == 'menunggu'): ?>
                                         <a href="?panggil=<?= $row['id_reservasi'] ?>" class="btn-panggil" onclick="return confirm('Panggil pasien <?= $row['nama_lengkap'] ?>?')">Panggil</a>
                                     <?php elseif ($row['status_antrian'] == 'dipanggil'): ?>
-                                        <a href="?selesai=<?= $row['id_reservasi'] ?>" class="btn-selesai" onclick="return confirm('Selesaikan pemeriksaan <?= $row['nama_lengkap'] ?>?')">Selesai</a>
+                                        <span class="btn-lihat" style="background:#dbeafe; color:#2563eb; cursor:default;">Dipanggil</span>
                                     <?php elseif ($row['status_antrian'] == 'selesai'): ?>
                                         <span class="btn-lihat" style="background:#d1fae5; color:#059669; cursor:default;">✓ Selesai</span>
-                                    <?php else: ?>
-                                        <span class="btn-lihat" style="background:#fee2e2; color:#dc2626; cursor:default;">✗ Batal</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
